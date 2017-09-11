@@ -22,20 +22,7 @@ m1 = ParameterInputs.EmpToUnempConst
 
 VA.java
 
-```/**
-  * Updated verison of Annuitization Decision
-  * <p>
-  *   This version of Annuitization Decision takes care of calculation of Annuity payment Streams, and their percieved value with Hyperbolic 
-  *   discounting, and compares it with the Perceived benefit of Death Benefit or Liquidity
-  * </p>
-  * <p>
-  *     Note this function will need to be updated if a rollup only DB is included in the scope
-  * </p>
-  * @param Age Age of the policyholder
-  * @param AF actuarial function containing the health, date, etc and calculating value of actuarial stuff
-  * @param gender is True if policyholder is Male
-  * @return true is Policyholder is to Annuitize in current month
-  */
+```
  public boolean annuitizationDecision(int Age, ActuarialFunc AF, boolean gender){
 	 boolean annuitize = false;
 	 int perceptionBias = rand.nextInt(6); //how long does the policyholder think they will live for sure
@@ -65,32 +52,7 @@ VA.java
 	 AF.setDiscAdj_t(1); //reset the hyperbolic discount to 1 - rational tvm
 	 return annuitize;
  }
- 
- /**
-  * Decision on whether or not to accept Buyout
-  * <p>
-  * 2.	If offer > 0 then policyholder simulates probability that they evaluate the offer, might look something like below, where attention_t is a parameter we will pass in and it will vary based on where we are in the buyout cycle
-  * 	a = new Random().nextDouble()
-  * 	if(a < attention_t)
-  *     offerDecision(offerAmt);
-  *    3.	If offerDecision is called the policyholder would calculate the following probability and simulate the outcome the decision function is:
-  *    y = 1 / (1+exp(b1*Health*MAXDB + b2*(saving_year / total_assets) + b3*max(min(IBWait, 85-Age),1)+b4*(OfferAmt/(percievedIBValue+percievedDBvalue))))
-  *    where:
-  * 	Health is 1 if the person is sick, MAXDB is 1 if there is a max DB, saving_year is the total savings in the last 12 months, total_assets are the total assets, IB_wait is the IB wait period, and  percievedIBValue & percievedDBvalue are the policyholder's idiosyncratic valuations of the IB and the DB, these are the same calculations used in the annuitization decision
-  * 4.	If the policyholder either does not evaluate the decision or does not accept the buyout she will move through the rest of the snap shot update function
-  * 	a.	When she comes to voluntary lapse ï¿½ if she decides to lapse, we will put her in the buyout acceptance bucket 
-  * 	b.	When she comes to the withdrawal hierarchy ï¿½ she will evaluate the VA as having not just the AV available but also the offer amount, this should push the VA forward in the function, and if the VA is lapsed due to need we will count that as a buyout acceptance too
-  * 5.	Update offer amount based on file ï¿½ should build an update function in case we canï¿½t read it in
-  *</p>
-  *
-  * @param Age Person age in the current snapshot
-  * @param h health state of the person in the current snapshot
-  * @param d Current Snapshot Date
-  * @param gender is True if policyholder is Male
-  * @param total_assets for offerDecision
-  * @param PersonId for Offer Amount
-  * @return boolean indicating outcome of the decision
-  */
+
  public boolean buyoutDecision(int Age, HealthState h, Date d, boolean gender, int total_assets, double netcashflow, int PersonId, MarketFactors m, ActuarialFunc AF){
 	 double offerAmt = updateOfferAmount(PersonId, m, d); 
 	 this.buyoutelig = false;
