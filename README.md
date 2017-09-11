@@ -23,110 +23,15 @@ m1 = ParameterInputs.EmpToUnempConst
 VA.java
 
 ```
- public boolean annuitizationDecision(int Age, ActuarialFunc AF, boolean gender){
-	 boolean annuitize = false;
-	 int perceptionBias = rand.nextInt(6); //how long does the policyholder think they will live for sure
-	 if(AF.getHealthStatus() == HealthState.Poor) perceptionBias = 0;
-	 AF.setDiscAdj_t(ParameterInputs.VAHyperDiscFactor); //override discount factor in AF so we have hyperbolic discounting
-	 int Value = (int) AF.calc_nCertLifeAnn(Age, perceptionBias) * this.calcAnnPayment(AF, gender, Age); //expected pv of annuity times payment amount
-	 int DBfv = 0;
+int Cost = (int)((ParameterInputs.VALapseprob * lapsefv + (1.0 - ParameterInputs.VALapseprob)*DBfv)* ParameterInputs.VAannCushion);
 
-	 if(BB[BenefitType.DB.getIndex()].RiderType.equals("MAX"))
-	 {//RU BB grows so we need to split into an increasing term life and a deferred term life with a higher benefit
-		 int dbGrowPeriod = Math.max(BB[BenefitType.IB.getIndex()].MaxAge - Age, 0); //DB Rolls up to end of IB
-		 double dbInc =  BB[BenefitType.DB.getIndex()].BB[0] * AF.calcIncLife(Age, dbGrowPeriod, BB[BenefitType.DB.getIndex()].RollupRate); //increasing life ins from growing db
-		 double dbTerm = (BB[BenefitType.DB.getIndex()].BB[0] * Math.pow(1+BB[BenefitType.DB.getIndex()].RollupRate, dbGrowPeriod)); // the DB has rolled up to the max ib age
-         dbTerm *= AF.calc_defTermLife(Age, dbGrowPeriod, Math.max(BB[BenefitType.DB.getIndex()].MaxAge - BB[BenefitType.IB.getIndex()].MaxAge, 0)); // term life ending at max db age with ru benefit
-         DBfv = (int) (dbInc + dbTerm);
-	 }
-	 else
-     {//ROP and Ratchet dont grow so we can treat the whole benefit as one longer term policy
-         int t = Math.max(BB[BenefitType.DB.getIndex()].MaxAge - Age, 0);
-         DBfv = (int) (Math.max(BB[BenefitType.DB.getIndex()].BB[1],BB[BenefitType.DB.getIndex()].BB[2]) * AF.calcLife(Age, t));
-     }
+if(d1==0) rndm=ParameterInputs.VAattention_t1;
+	else if(d1==1)rndm=ParameterInputs.VAattention_t2;
+	else if(d1==2)rndm=ParameterInputs.VAattention_t3;
+	rndm *= attentionMult;
 
-	 int lapsefv = Commonmethods.sumarray(AccountValue) ;
-	 int Cost = (int)((ParameterInputs.VALapseprob * lapsefv + (1.0 - ParameterInputs.VALapseprob)*DBfv)* ParameterInputs.VAannCushion);
-	 //@TODO Determine how comparable value and cost actually are
-	 if(Value > Cost) annuitize = true;
-	 AF.setDiscAdj_t(1); //reset the hyperbolic discount to 1 - rational tvm
-	 return annuitize;
- }
 
- public boolean buyoutDecision(int Age, HealthState h, Date d, boolean gender, int total_assets, double netcashflow, int PersonId, MarketFactors m, ActuarialFunc AF){
-	 double offerAmt = updateOfferAmount(PersonId, m, d); 
-	 this.buyoutelig = false;
-	 this.buyoutamt = 0;
-	 boolean AcceptBuyout = false;
-	 double anchorRef = 1.0; //not used unless has offer anchor is true
-     if(this.hasOfferAnchor){ anchorRef = this.offerAnchor;}
-	 if (offerAmt > 0){
-		 double rndm = 0;
-		 this.buyoutelig = true;
-		 this.buyoutamt = (int) offerAmt;
-		 double attentionMult = 1.0;
-		 if(hasOfferAnchor) //the policyholder will pay less attention to subsequent offers, but attention recovers overtime
-		 {
-		 	attentionMult = (1.0 - Math.pow(ParameterInputs.VAattention_serial, this.yrsSinceLastOffer)); //reduction to attention for serial offers
-		 }
-		 int d1=Commonmethods.getDateDifferenceinCalMonths(OfferAmountLookup.getOfferDate(PersonId), d);
-		 if(d1==0) rndm=ParameterInputs.VAattention_t1;
-		 else if(d1==1)rndm=ParameterInputs.VAattention_t2;
-		 else if(d1==2)rndm=ParameterInputs.VAattention_t3;
-		 rndm *= attentionMult;
-		 double a = rand.nextDouble();
-		 if(a < rndm){
-		 	AcceptBuyout = offerDecision(h, netcashflow, total_assets,Math.max(BB[BenefitType.IB.getIndex()].MaxAge - Age,0), anchorRef, offerAmt);
-            newOfferAnchor =  offerAmt / (BB[BenefitType.IB.getIndex()].IBUseBB() * 1.0);
-            updateOffer = true;
-         }
-         if((d1>=2)&&updateOffer){
-		    offerAnchor = newOfferAnchor;
-		    yrsSinceLastOffer = 0;
-		    hasOfferAnchor = true;
-            newOfferAnchor = 0;
-            updateOffer = false;
-         }
-	 }
-	 return AcceptBuyout;
- }
-
-	/**
-	 * Function to calculate the probability that the policyholder accepts the offer and simulation of decision
-	 * <p>
-	 *     The function is based on the original logic developed in conjunction with PWC. The policyholder considers
-	 *     how they are feeling if they have a max db, how much time the have until the ib goes away, how their cash flow
-	 *     has been over recent time, and the relative value of the offer compared to what they think the contract is worth
-	 * </p>
-	 * <p>
-	 *     The probability takes the form 1/1+e(x) and the draw uses the random uniform distribution
-	 * </p>
-	 * @param h current health state
-	 * @param netcashflow ewma of the momthly net cash flow for the ph
-	 * @param assets total asset balances
-	 * @param ibTime time left until IB expires
-	 * @param anchorRatio offer / ib bb in last offer the ph saw
-     * @param offerAmt the current buyout offer amount
-	 * @return boolean indicating whether or not the policyholder has accepted the offer
-	 * @todo confirm decision to have no offer ratio comparison term for first time offers
-	 */
- private boolean offerDecision(HealthState h, double netcashflow, int assets, int ibTime, double anchorRatio, double offerAmt)
- {
-	 int Health = 0;
-	 int MAXDB = 0;
-	 double probAccept;
-	 double draw = rand.nextDouble();
-
-	 if(h==HealthState.Poor) Health = 1;
-	 if(BB[BenefitType.DB.getIndex()].RiderType.equals("MAX")) MAXDB = 1;
-
-	 double dbTerm = MAXDB * Health; //dummy variable = 1 if sick and max db
-	 double savingsPerformance = netcashflow/(1.0 * assets); //ratio of monthly net cash flow to total assets
-	 double offerRt = offerAmt/(BB[BenefitType.IB.getIndex()].IBUseBB() * 1.0); //ratio of current offer amount to the IB benefit base
-	 double vsPrior = 0.0; //holds the difference in the ratio between offer and IB BB in the current offer versus the last offer the ph noticed
-	 if(this.hasOfferAnchor) vsPrior = offerRt - anchorRatio;
-
-	 probAccept = ParameterInputs.VABuyOutcoeff1
+probAccept = ParameterInputs.VABuyOutcoeff1
 			 + ParameterInputs.VABuyOutcoeff1 * dbTerm
 			 + ParameterInputs.VABuyOutcoeff3 * savingsPerformance
 			 + ParameterInputs.VABuyOutcoeff4 * ibTime
@@ -136,8 +41,8 @@ VA.java
 	 probAccept = 1.0 / (1.0 + Math.exp(probAccept));
 
 	 if(probAccept < draw) return true;
-	 else return false;
- }
+	 else return false;	 
+
 ```
 
 ```
